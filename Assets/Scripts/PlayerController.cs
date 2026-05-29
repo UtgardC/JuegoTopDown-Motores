@@ -9,12 +9,16 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float gravity = -9.81f;
     [SerializeField] private float rotationSpeed = 20f;
 
+    [Header("Camera Reference")]
+    [SerializeField]
+    [Tooltip("Camara usada para convertir el input de movimiento a espacio de pantalla. Si queda vacia usa Main Camera.")]
+    private Camera gameplayCamera;
+
     [Header("Aiming References")]
     [SerializeField]
     [Tooltip("Objeto vacío en el mundo que marca dónde está apuntando el mouse.")]
     private Transform aimTarget;
 
-    private Camera mainCamera;
     private CharacterController characterController;
     private Vector2 moveInput;
     private Vector3 lookTarget;
@@ -24,7 +28,11 @@ public class PlayerController : MonoBehaviour
     private void Awake()
     {
         characterController = GetComponent<CharacterController>();
-        mainCamera = Camera.main;
+
+        if (gameplayCamera == null)
+        {
+            gameplayCamera = Camera.main;
+        }
     }
 
     public void OnMove(InputAction.CallbackContext context)
@@ -43,9 +51,12 @@ public class PlayerController : MonoBehaviour
 
     public void OnLook(InputAction.CallbackContext context)
     {
+        Camera cameraToUse = GetGameplayCamera();
+        if (cameraToUse == null) return;
+
         Vector2 mouseScreenPosition = context.ReadValue<Vector2>();
 
-        Ray ray = mainCamera.ScreenPointToRay(mouseScreenPosition);
+        Ray ray = cameraToUse.ScreenPointToRay(mouseScreenPosition);
         Plane groundPlane = new Plane(Vector3.up, Vector3.zero);
 
         if (groundPlane.Raycast(ray, out float enter))
@@ -82,9 +93,42 @@ public class PlayerController : MonoBehaviour
 
     private void MovePlayer()
     {
-        Vector3 movement = new Vector3(moveInput.x, 0f, moveInput.y) * moveSpeed;
+        Vector3 movement = GetCameraRelativeMoveDirection() * moveSpeed;
         movement.y = verticalVelocity;
         characterController.Move(movement * Time.deltaTime);
+    }
+
+    private Vector3 GetCameraRelativeMoveDirection()
+    {
+        Camera cameraToUse = GetGameplayCamera();
+
+        Vector3 forward = Vector3.forward;
+        Vector3 right = Vector3.right;
+
+        if (cameraToUse != null)
+        {
+            forward = cameraToUse.transform.forward;
+            right = cameraToUse.transform.right;
+
+            forward.y = 0f;
+            right.y = 0f;
+
+            forward = forward.sqrMagnitude > 0.001f ? forward.normalized : Vector3.forward;
+            right = right.sqrMagnitude > 0.001f ? right.normalized : Vector3.right;
+        }
+
+        Vector3 moveDirection = (right * moveInput.x) + (forward * moveInput.y);
+        return Vector3.ClampMagnitude(moveDirection, 1f);
+    }
+
+    private Camera GetGameplayCamera()
+    {
+        if (gameplayCamera == null)
+        {
+            gameplayCamera = Camera.main;
+        }
+
+        return gameplayCamera;
     }
 
     private void RotateTowardsMouse()
