@@ -15,6 +15,10 @@ public class CrosshairFollow : MonoBehaviour
     [Tooltip("Determines if the cursor should be confined inside the game window.")]
     private bool confineCursorToWindow = true;
 
+    [SerializeField]
+    [Tooltip("Prevents the crosshair from following the mouse while the game is paused.")]
+    private bool stopFollowingWhilePaused = true;
+
     private RectTransform crosshairRectTransform;
 
     private void Awake()
@@ -36,7 +40,7 @@ public class CrosshairFollow : MonoBehaviour
 
     private void Update()
     {
-        if (Mouse.current == null)
+        if (Mouse.current == null || (stopFollowingWhilePaused && Time.timeScale <= 0f))
         {
             return;
         }

@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b1327c3bc0864866aa3f7a575a504fc2, type: 3}
+  m_Name: Pistola
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponDefinition
+  weaponName: Pistola
+  mode: 0
+  ammo: 10
+  damage: 10
+  range: 13
+  fireRate: 0.25
+  automatic: 0
+  pelletCount: 6
+  spreadAngle: 30
+  model: {fileID: 6697270083544677715, guid: 6bca32b8d80c6f34b999b900688f48c7, type: 3}
+  pickupPrefab: {fileID: 868700910699278044, guid: 0b430149cdbf0b649b26a0e4ee86393e, type: 3}

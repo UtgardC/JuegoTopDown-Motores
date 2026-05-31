@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b1327c3bc0864866aa3f7a575a504fc2, type: 3}
+  m_Name: Subfusil
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponDefinition
+  weaponName: Subfusil
+  mode: 0
+  ammo: 30
+  damage: 5
+  range: 10
+  fireRate: 0.2
+  automatic: 1
+  pelletCount: 10
+  spreadAngle: 30
+  model: {fileID: 4646516842161146739, guid: 359803176f962fd468f7fe334a9404ba, type: 3}
+  pickupPrefab: {fileID: 1524757316679088267, guid: 2ac34f935155e3742b01d38ca354bcc2, type: 3}

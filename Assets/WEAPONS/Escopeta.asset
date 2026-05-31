@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b1327c3bc0864866aa3f7a575a504fc2, type: 3}
+  m_Name: Escopeta
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponDefinition
+  weaponName: Escopeta
+  mode: 1
+  ammo: 8
+  damage: 10
+  range: 7
+  fireRate: 1
+  automatic: 0
+  pelletCount: 10
+  spreadAngle: 40
+  model: {fileID: 6085325812210356478, guid: 93da9dc6f38f52e4c8acd931b37b4654, type: 3}
+  pickupPrefab: {fileID: 6293521518034520934, guid: 920e06ea49f49be43932926972ec4c20, type: 3}
