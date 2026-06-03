@@ -1,0 +1,14 @@
+Este codigo es un juego topdown shooter 3d hecho en unity 6. Revisa todos los scripts, pero para que tengas contexto, el juego tiene un jugador que se puede mover, que esta en una layer player, y puede recoger armas y disparar con ellas. EL jugador tiene varios métodos para perder vida y recuperarla, vinculados a algunos efectos de la barra de vida. 
+
+Ahora, lo que necesito programar es enemigos. Estos enemigos tienen una velocidad dada, y una salud (revisar que ya existe un script que permite darle salud a un elemento, que sea disparable y disparar eventos al perder vida, morir, etc). Los enemigos tienen un radio de detección (dibujar con un gizmo). Si el jugador entra en ese radio, los enemigos trackean al jugador e van a atacar. Tambien, si el jugador NO está en rango de detección pero dentro de su rango de detección un enemigo pierde salud, entonces igualmente activan el track (que seria para simular el caso de que el jugador le dispare a un enemigo con un arma a distancia, eso "alertará" al resto de enemigos). El enemigo tiene un rango de disparo. Intenta acercarse al jugador hasta entrar en rango. Si está en rango intentará disparar. Cuando intenta disparar, el enemigo "fija" el apuntado hacia el jugador, pero espera  0,5s antes de disparar (Y el disparo es un raycast), asi podemos dar un tiempo de gracia que haga que los disparos sean esquivables. Si el jugador se aleja vuelve a repetir. Hay otro rango que mide la cercanía. Si el jugador y el enemigo están muy cerca, el enemigo se intentará alejar del jugador. Mientras se aleja, puede disparar. Cuando llega a una distancia segura, vuelve a operar como antes Si al enemigo se le dispara, sufre daño (revisar el sistema creado para HealthTarget, hay que intentar usarlo ya que este provee logica para simular sangre al recibir daño, etc). Cuando un enemigo muere, suelta un arma (revisar que existen los pickups de armas, instanciables a traves del weapon definition).
+
+Aparte, mi plan es crear 4 enemigos distintos, cada uno con propiedades ligeralmente distintas (quiza convena definir una clase padre y luego cada hijo sera el tipo de enemigo).
+
+Tenemos enemigo con pistola, enemigo con subfusil, enemigo con escopeta y enemigo con katana.
+
+El enemigo con pistola cuenta con mayor rango, y tiene la propiedad de que cuando está en rango seguro se puede seguir moviendo (orbitando al jugador) mientras intenta disparar.
+
+El enemigo con subfusil cuenta con un rango medio, y tiene la propiedad de que cuando empieza a disparar, se queda quieto en el lugar y sigue disparando unas cuantas balas mas (con una cadencia dada, y intenta seguir apuntado al jugador con un ligero delay, como abarcando un área. Si
+
+El 
+
