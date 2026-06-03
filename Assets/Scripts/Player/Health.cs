@@ -2,53 +2,27 @@ using System;
 using UnityEngine;
 using UnityEngine.Events;
 
-public interface IHealthReadable
-{
-    float CurrentHealth { get; }
-    float MaxHealth { get; }
-    float HealthNormalized { get; }
-    bool IsDead { get; }
-}
-
-public interface IHealable
-{
-    void Heal(float amount);
-}
-
-public interface IKillable
-{
-    void Kill();
-}
-
 [Serializable]
-public class HealthChangedEvent : UnityEvent<float, float, float>
+public class HealthEvent : UnityEvent<Health>
 {
 }
 
-[Serializable]
-public class DamageTakenEvent : UnityEvent<float, Vector3, Vector3>
-{
-}
-
-[Serializable]
-public class HealedEvent : UnityEvent<float>
-{
-}
-
-[Serializable]
-public class HealthTargetEvent : UnityEvent<HealthTarget>
-{
-}
-
-public class HealthTarget : MonoBehaviour, IDamageable, IHealthReadable, IHealable, IKillable
+public class Health : MonoBehaviour, IDamageable, IHealthReadable, IHealable, IKillable
 {
     [Header("Health")]
     [SerializeField] private float maxHealth = 100f;
     [SerializeField] private bool startAtFullHealth = true;
     [SerializeField] private float startingHealth = 100f;
-    [SerializeField] private bool invulnerable;
-    [SerializeField] private bool destroyOnDeath;
-    [SerializeField] private bool logDamageEvents;
+
+    [Header("Damage Immunity")]
+    [SerializeField]
+    [Range(0f, 1f)]
+    [Tooltip("A hit must deal more than this percentage of max health to trigger damage immunity. 0.05 = 5%.")]
+    private float damageImmunityThresholdNormalized = 0.05f;
+
+    [SerializeField]
+    [Tooltip("Seconds of damage immunity granted after a hit passes the threshold.")]
+    private float damageImmunityDuration = 0.3f;
 
     [Header("Events")]
     [SerializeField]
@@ -65,29 +39,34 @@ public class HealthTarget : MonoBehaviour, IDamageable, IHealthReadable, IHealab
 
     [SerializeField]
     [Tooltip("Fired once when health reaches zero.")]
-    private HealthTargetEvent onDeath = new HealthTargetEvent();
+    private HealthEvent onDeath = new HealthEvent();
 
     [Header("Runtime State")]
     [SerializeField, ReadOnlyField] private float currentHealth;
     [SerializeField, ReadOnlyField] private float currentHealthNormalized;
     [SerializeField, ReadOnlyField] private bool isDead;
+    [SerializeField, ReadOnlyField] private bool isDamageImmune;
+    [SerializeField, ReadOnlyField] private float damageImmunityRemaining;
 
+    private float damageImmuneUntilTime;
     private bool initialized;
 
     public event Action<float, float, float> LifeChanged;
     public event Action<float, Vector3, Vector3> Damaged;
     public event Action<float> Healed;
-    public event Action<HealthTarget> Died;
+    public event Action<Health> Died;
 
     public float CurrentHealth => currentHealth;
     public float MaxHealth => maxHealth;
     public float HealthNormalized => currentHealthNormalized;
     public bool IsDead => isDead;
+    public bool IsDamageImmune => Time.time < damageImmuneUntilTime;
+    public float DamageImmunityRemaining => Mathf.Max(0f, damageImmuneUntilTime - Time.time);
 
     public HealthChangedEvent OnLifeChanged => onLifeChanged;
     public DamageTakenEvent OnDamaged => onDamaged;
     public HealedEvent OnHealed => onHealed;
-    public HealthTargetEvent OnDeath => onDeath;
+    public HealthEvent OnDeath => onDeath;
 
     private void Awake()
     {
@@ -99,34 +78,65 @@ public class HealthTarget : MonoBehaviour, IDamageable, IHealthReadable, IHealab
         NotifyLifeChanged();
     }
 
+    private void Update()
+    {
+        UpdateRuntimeState();
+    }
+
     private void OnValidate()
     {
         maxHealth = Mathf.Max(1f, maxHealth);
         startingHealth = Mathf.Clamp(startingHealth, 0f, maxHealth);
+        damageImmunityDuration = Mathf.Max(0f, damageImmunityDuration);
         UpdateRuntimeState();
     }
 
     public void TakeDamage(float damage, Vector3 hitPoint, Vector3 hitDirection)
     {
-        InitializeHealth();
+        Damage(damage, hitPoint, hitDirection);
+    }
 
-        if (invulnerable || isDead)
+    public bool Damage(float damage)
+    {
+        return Damage(damage, transform.position, Vector3.zero);
+    }
+
+    public bool Damage(float damage, Vector3 hitPoint, Vector3 hitDirection)
+    {
+        InitializeHealth();
+        UpdateRuntimeState();
+
+        if (isDead || isDamageImmune)
         {
-            LogDamage($"ignored {damage:0.##} damage. Invulnerable: {invulnerable}. Dead: {isDead}.");
-            return;
+            return false;
         }
 
-        float appliedDamage = Mathf.Max(0f, damage);
+        float requestedDamage = Mathf.Max(0f, damage);
+        float appliedDamage = Mathf.Min(currentHealth, requestedDamage);
         if (appliedDamage <= 0f)
         {
-            return;
+            return false;
         }
 
-        float previousHealth = currentHealth;
-        SetHealthInternal(currentHealth - appliedDamage);
-        LogDamage($"received {appliedDamage:0.##} damage. Health {previousHealth:0.##} -> {currentHealth:0.##}.");
+        currentHealth = Mathf.Clamp(currentHealth - appliedDamage, 0f, maxHealth);
+
+        if (appliedDamage > maxHealth * damageImmunityThresholdNormalized)
+        {
+            damageImmuneUntilTime = Time.time + damageImmunityDuration;
+        }
+
+        UpdateRuntimeState();
+        NotifyLifeChanged();
+
         Damaged?.Invoke(appliedDamage, hitPoint, hitDirection);
         onDamaged.Invoke(appliedDamage, hitPoint, hitDirection);
+
+        if (currentHealth <= 0f)
+        {
+            Die();
+        }
+
+        return true;
     }
 
     public void Heal(float amount)
@@ -138,13 +148,16 @@ public class HealthTarget : MonoBehaviour, IDamageable, IHealthReadable, IHealab
             return;
         }
 
-        float appliedHeal = Mathf.Max(0f, amount);
+        float appliedHeal = Mathf.Min(maxHealth - currentHealth, Mathf.Max(0f, amount));
         if (appliedHeal <= 0f)
         {
             return;
         }
 
-        SetHealthInternal(currentHealth + appliedHeal);
+        currentHealth = Mathf.Clamp(currentHealth + appliedHeal, 0f, maxHealth);
+        UpdateRuntimeState();
+        NotifyLifeChanged();
+
         Healed?.Invoke(appliedHeal);
         onHealed.Invoke(appliedHeal);
     }
@@ -152,7 +165,21 @@ public class HealthTarget : MonoBehaviour, IDamageable, IHealthReadable, IHealab
     public void SetHealth(float health)
     {
         InitializeHealth();
-        SetHealthInternal(health);
+
+        bool wasDead = isDead;
+        currentHealth = Mathf.Clamp(health, 0f, maxHealth);
+        if (currentHealth > 0f)
+        {
+            isDead = false;
+        }
+
+        UpdateRuntimeState();
+        NotifyLifeChanged();
+
+        if (currentHealth <= 0f && !wasDead)
+        {
+            Die();
+        }
     }
 
     public void ResetHealth()
@@ -160,6 +187,7 @@ public class HealthTarget : MonoBehaviour, IDamageable, IHealthReadable, IHealab
         maxHealth = Mathf.Max(1f, maxHealth);
         currentHealth = maxHealth;
         isDead = false;
+        damageImmuneUntilTime = 0f;
         initialized = true;
         UpdateRuntimeState();
         NotifyLifeChanged();
@@ -174,7 +202,10 @@ public class HealthTarget : MonoBehaviour, IDamageable, IHealthReadable, IHealab
             return;
         }
 
-        SetHealthInternal(0f);
+        currentHealth = 0f;
+        UpdateRuntimeState();
+        NotifyLifeChanged();
+        Die();
     }
 
     private void InitializeHealth()
@@ -187,27 +218,8 @@ public class HealthTarget : MonoBehaviour, IDamageable, IHealthReadable, IHealab
         maxHealth = Mathf.Max(1f, maxHealth);
         currentHealth = startAtFullHealth ? maxHealth : Mathf.Clamp(startingHealth, 0f, maxHealth);
         isDead = currentHealth <= 0f;
-        UpdateRuntimeState();
         initialized = true;
-    }
-
-    private void SetHealthInternal(float health)
-    {
-        float previousHealth = currentHealth;
-        currentHealth = Mathf.Clamp(health, 0f, maxHealth);
         UpdateRuntimeState();
-
-        if (Mathf.Approximately(previousHealth, currentHealth))
-        {
-            return;
-        }
-
-        NotifyLifeChanged();
-
-        if (currentHealth <= 0f)
-        {
-            Die();
-        }
     }
 
     private void NotifyLifeChanged()
@@ -219,14 +231,8 @@ public class HealthTarget : MonoBehaviour, IDamageable, IHealthReadable, IHealab
     private void UpdateRuntimeState()
     {
         currentHealthNormalized = maxHealth > 0f ? currentHealth / maxHealth : 0f;
-    }
-
-    private void LogDamage(string message)
-    {
-        if (logDamageEvents)
-        {
-            Debug.Log($"[HealthTarget] {name} {message}", this);
-        }
+        isDamageImmune = Time.time < damageImmuneUntilTime;
+        damageImmunityRemaining = Mathf.Max(0f, damageImmuneUntilTime - Time.time);
     }
 
     private void Die()
@@ -237,12 +243,8 @@ public class HealthTarget : MonoBehaviour, IDamageable, IHealthReadable, IHealab
         }
 
         isDead = true;
+        UpdateRuntimeState();
         Died?.Invoke(this);
         onDeath.Invoke(this);
-
-        if (destroyOnDeath)
-        {
-            Destroy(gameObject);
-        }
     }
 }

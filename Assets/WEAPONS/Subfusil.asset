@@ -16,10 +16,11 @@ MonoBehaviour:
   mode: 0
   ammo: 30
   damage: 5
-  range: 10
-  fireRate: 0.2
+  range: 12
+  fireRate: 0.1
   automatic: 1
   pelletCount: 10
   spreadAngle: 30
   model: {fileID: 4646516842161146739, guid: 359803176f962fd468f7fe334a9404ba, type: 3}
+  impactEffectPrefab: {fileID: 1453519202490855767, guid: 13c61c08d42637b4580293b9e0b9b3d4, type: 3}
   pickupPrefab: {fileID: 1524757316679088267, guid: 2ac34f935155e3742b01d38ca354bcc2, type: 3}

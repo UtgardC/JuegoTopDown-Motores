@@ -57,6 +57,14 @@ public class PlayerController : MonoBehaviour
     private float defaultAimRange = 20f;
 
     [SerializeField]
+    [Tooltip("Global multiplier applied only to the visual sight cursor range. It does not change weapon damage range.")]
+    private float sightRangeVisualMultiplier = 1f;
+
+    [SerializeField]
+    [Tooltip("Extra multiplier by weapon range for the visual sight cursor. X = weapon range, Y = visual range multiplier.")]
+    private AnimationCurve sightRangeVisualMultiplierByRange = AnimationCurve.Linear(0f, 1f, 30f, 1f);
+
+    [SerializeField]
     [Range(0f, 1f)]
     [Tooltip("How much the unclamped auxiliary cursor contributes to the camera aim target.")]
     private float auxAimTargetWeight;
@@ -83,7 +91,8 @@ public class PlayerController : MonoBehaviour
     public Vector2 RawMouseScreenPosition => rawMouseScreenPosition;
     public Vector3 RawAimWorldPoint => rawAimWorldPoint;
     public Vector3 SightAimWorldPoint => sightAimWorldPoint;
-    public float CurrentAimRange => GetCurrentAimRange();
+    public float CurrentAimRange => GetCurrentSightAimRange();
+    public float CurrentWeaponAimRange => GetCurrentWeaponAimRange();
 
     private int SafeMaxDashCharges => Mathf.Max(1, maxDashCharges);
     private float SafeDashPointsPerCharge => Mathf.Max(1f, dashPointsPerCharge);
@@ -121,6 +130,12 @@ public class PlayerController : MonoBehaviour
         dashRechargeSecondsPerCharge = Mathf.Max(0.01f, dashRechargeSecondsPerCharge);
         dashInputDeadzone = Mathf.Max(0f, dashInputDeadzone);
         defaultAimRange = Mathf.Max(0f, defaultAimRange);
+        sightRangeVisualMultiplier = Mathf.Max(0f, sightRangeVisualMultiplier);
+
+        if (sightRangeVisualMultiplierByRange == null)
+        {
+            sightRangeVisualMultiplierByRange = AnimationCurve.Linear(0f, 1f, 30f, 1f);
+        }
     }
 
     public void OnMove(InputAction.CallbackContext context)
@@ -310,7 +325,7 @@ public class PlayerController : MonoBehaviour
         return origin + (offset.normalized * range);
     }
 
-    private float GetCurrentAimRange()
+    private float GetCurrentWeaponAimRange()
     {
         if (weaponController == null)
         {
@@ -323,6 +338,16 @@ public class PlayerController : MonoBehaviour
         }
 
         return Mathf.Max(0f, defaultAimRange);
+    }
+
+    private float GetCurrentSightAimRange()
+    {
+        float weaponRange = GetCurrentWeaponAimRange();
+        float curveMultiplier = sightRangeVisualMultiplierByRange != null
+            ? sightRangeVisualMultiplierByRange.Evaluate(weaponRange)
+            : 1f;
+
+        return Mathf.Max(0f, weaponRange * sightRangeVisualMultiplier * Mathf.Max(0f, curveMultiplier));
     }
 
     private void RotateTowardsMouse()

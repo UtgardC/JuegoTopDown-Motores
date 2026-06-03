@@ -19,11 +19,14 @@ public class PlayerWeaponController : MonoBehaviour
 
     [Header("Debug")]
     [SerializeField] private bool drawWeaponUsePreview;
+    [SerializeField] private bool logWeaponDamage;
 
     private readonly HashSet<IDamageable> meleeHits = new HashSet<IDamageable>();
+    private readonly Dictionary<IDamageable, SpreadDamageHit> spreadHits = new Dictionary<IDamageable, SpreadDamageHit>();
 
     private WeaponDefinition currentWeapon;
     private GameObject currentWeaponModel;
+    private WeaponVisualEffects currentWeaponVisualEffects;
     private int currentAmmo;
     private float nextFireTime;
     private bool fireHeld;
@@ -31,6 +34,13 @@ public class PlayerWeaponController : MonoBehaviour
     public WeaponDefinition CurrentWeapon => currentWeapon;
     public int CurrentAmmo => currentAmmo;
     public bool HasWeapon => currentWeapon != null;
+
+    private struct SpreadDamageHit
+    {
+        public float Damage;
+        public Vector3 HitPoint;
+        public Vector3 HitDirection;
+    }
 
     private void Awake()
     {
@@ -109,6 +119,7 @@ public class PlayerWeaponController : MonoBehaviour
             currentWeaponModel.transform.localPosition = Vector3.zero;
             currentWeaponModel.transform.localRotation = Quaternion.identity;
             currentWeaponModel.transform.localScale = Vector3.one;
+            currentWeaponVisualEffects = currentWeaponModel.GetComponentInChildren<WeaponVisualEffects>(true);
         }
     }
 
@@ -151,6 +162,7 @@ public class PlayerWeaponController : MonoBehaviour
 
         currentAmmo--;
         nextFireTime = Time.time + currentWeapon.FireRate;
+        PlayMuzzleFlash();
 
         switch (currentWeapon.Mode)
         {
@@ -183,7 +195,12 @@ public class PlayerWeaponController : MonoBehaviour
 
         if (Physics.Raycast(ray, out RaycastHit hit, currentWeapon.Range, raycastMask, QueryTriggerInteraction.Ignore))
         {
-            ApplyDamage(hit.collider, damage, hit.point, ray.direction);
+            LogWeaponDamage($"Normal hit {GetColliderInfo(hit.collider)} for {damage:0.##} damage.");
+            ApplyDamage(hit.collider, damage, hit.point, ray.direction, true);
+        }
+        else
+        {
+            LogWeaponDamage($"Normal missed. Range: {currentWeapon.Range:0.##}.");
         }
     }
 
@@ -196,6 +213,9 @@ public class PlayerWeaponController : MonoBehaviour
         Vector3 baseDirection = GetShootDirection();
         Vector3 origin = GetFireOriginPosition();
 
+        spreadHits.Clear();
+        LogWeaponDamage($"Spread fired. Pellets: {pelletCount}. Damage per pellet: {damagePerPellet:0.##}. Range: {currentWeapon.Range:0.##}.");
+
         for (int i = 0; i < pelletCount; i++)
         {
             float angle = startAngle + (angleStep * i);
@@ -204,9 +224,24 @@ public class PlayerWeaponController : MonoBehaviour
 
             if (Physics.Raycast(ray, out RaycastHit hit, currentWeapon.Range, raycastMask, QueryTriggerInteraction.Ignore))
             {
-                ApplyDamage(hit.collider, damagePerPellet, hit.point, pelletDirection);
+                IDamageable damageable = GetDamageable(hit.collider);
+                if (damageable == null)
+                {
+                    LogWeaponDamage($"Spread pellet {i} hit {GetColliderInfo(hit.collider)}, but no IDamageable was found in parents.");
+                    continue;
+                }
+
+                LogWeaponDamage($"Spread pellet {i} hit {GetDamageableInfo(damageable)} through {GetColliderInfo(hit.collider)} for {damagePerPellet:0.##} damage.");
+                AccumulateSpreadDamage(damageable, damagePerPellet, hit.point, pelletDirection);
+                SpawnImpactEffect(hit.point, pelletDirection);
+            }
+            else
+            {
+                LogWeaponDamage($"Spread pellet {i} missed.");
             }
         }
+
+        ApplySpreadDamage();
     }
 
     private void FireMelee()
@@ -227,17 +262,140 @@ public class PlayerWeaponController : MonoBehaviour
             }
 
             meleeHits.Add(damageable);
-            damageable.TakeDamage(currentWeapon.Damage, hits[i].ClosestPoint(center), direction);
+            Vector3 hitPoint = hits[i].ClosestPoint(center);
+            Vector3 effectDirection = GetDirectionFromHitPointToPlayer(hitPoint);
+
+            LogWeaponDamage($"Melee hit {GetDamageableInfo(damageable)} through {GetColliderInfo(hits[i])} for {currentWeapon.Damage:0.##} damage.");
+            damageable.TakeDamage(currentWeapon.Damage, hitPoint, direction);
+            SpawnImpactEffect(hitPoint, effectDirection);
         }
     }
 
-    private void ApplyDamage(Collider targetCollider, float damage, Vector3 hitPoint, Vector3 hitDirection)
+    private void ApplyDamage(Collider targetCollider, float damage, Vector3 hitPoint, Vector3 hitDirection, bool spawnImpactEffect)
     {
-        IDamageable damageable = targetCollider.GetComponentInParent<IDamageable>();
+        IDamageable damageable = GetDamageable(targetCollider);
         if (damageable != null)
         {
+            LogWeaponDamage($"Applying {damage:0.##} damage to {GetDamageableInfo(damageable)}.");
             damageable.TakeDamage(damage, hitPoint, hitDirection);
+
+            if (spawnImpactEffect)
+            {
+                SpawnImpactEffect(hitPoint, hitDirection);
+            }
         }
+        else
+        {
+            LogWeaponDamage($"Hit {GetColliderInfo(targetCollider)}, but no IDamageable was found in parents.");
+        }
+    }
+
+    private IDamageable GetDamageable(Collider targetCollider)
+    {
+        return targetCollider != null ? targetCollider.GetComponentInParent<IDamageable>() : null;
+    }
+
+    private void AccumulateSpreadDamage(IDamageable damageable, float damage, Vector3 hitPoint, Vector3 hitDirection)
+    {
+        if (!spreadHits.TryGetValue(damageable, out SpreadDamageHit hitData))
+        {
+            hitData.HitPoint = hitPoint;
+            hitData.HitDirection = hitDirection;
+        }
+
+        hitData.Damage += damage;
+        spreadHits[damageable] = hitData;
+        LogWeaponDamage($"Spread accumulated {hitData.Damage:0.##} total damage for {GetDamageableInfo(damageable)}.");
+    }
+
+    private void ApplySpreadDamage()
+    {
+        if (spreadHits.Count == 0)
+        {
+            LogWeaponDamage("Spread applied no damage.");
+            return;
+        }
+
+        foreach (KeyValuePair<IDamageable, SpreadDamageHit> spreadHit in spreadHits)
+        {
+            SpreadDamageHit hitData = spreadHit.Value;
+            LogWeaponDamage($"Spread applying {hitData.Damage:0.##} total damage to {GetDamageableInfo(spreadHit.Key)}.");
+            spreadHit.Key.TakeDamage(hitData.Damage, hitData.HitPoint, hitData.HitDirection);
+        }
+
+        spreadHits.Clear();
+    }
+
+    private void LogWeaponDamage(string message)
+    {
+        if (logWeaponDamage)
+        {
+            Debug.Log($"[WeaponDamage] {message}", this);
+        }
+    }
+
+    private string GetDamageableInfo(IDamageable damageable)
+    {
+        if (damageable is Component component)
+        {
+            return component.name;
+        }
+
+        return damageable != null ? damageable.ToString() : "None";
+    }
+
+    private string GetColliderInfo(Collider targetCollider)
+    {
+        if (targetCollider == null)
+        {
+            return "None";
+        }
+
+        string layerName = LayerMask.LayerToName(targetCollider.gameObject.layer);
+        return $"{targetCollider.name} (Layer: {layerName})";
+    }
+
+    private void PlayMuzzleFlash()
+    {
+        if (currentWeaponVisualEffects != null)
+        {
+            currentWeaponVisualEffects.PlayMuzzleFlash();
+        }
+    }
+
+    private void SpawnImpactEffect(Vector3 position, Vector3 direction)
+    {
+        if (currentWeapon == null || currentWeapon.ImpactEffectPrefab == null)
+        {
+            return;
+        }
+
+        Instantiate(currentWeapon.ImpactEffectPrefab, position, GetEffectRotation(direction));
+    }
+
+    private Quaternion GetEffectRotation(Vector3 direction)
+    {
+        direction.y = 0f;
+
+        if (direction.sqrMagnitude <= 0.001f)
+        {
+            direction = transform.forward;
+        }
+
+        return Quaternion.LookRotation(direction.normalized, Vector3.up);
+    }
+
+    private Vector3 GetDirectionFromHitPointToPlayer(Vector3 hitPoint)
+    {
+        Vector3 direction = transform.position - hitPoint;
+        direction.y = 0f;
+
+        if (direction.sqrMagnitude <= 0.001f)
+        {
+            return -GetShootDirection();
+        }
+
+        return direction.normalized;
     }
 
     private WeaponPickup CreatePickup(Vector3 position, Quaternion rotation)
@@ -269,6 +427,7 @@ public class PlayerWeaponController : MonoBehaviour
         currentAmmo = 0;
         nextFireTime = 0f;
         fireHeld = false;
+        currentWeaponVisualEffects = null;
         ClearEquippedModel();
     }
 
@@ -278,6 +437,8 @@ public class PlayerWeaponController : MonoBehaviour
         {
             Destroy(currentWeaponModel);
         }
+
+        currentWeaponVisualEffects = null;
     }
 
     private void OnDrawGizmos()

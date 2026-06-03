@@ -18,6 +18,9 @@ public class WeaponDefinition : ScriptableObject
     [Header("Visual")]
     [SerializeField] private GameObject model;
 
+    [Header("Impact Effects")]
+    [SerializeField] private GameObject impactEffectPrefab;
+
     [Header("Pickup")]
     [SerializeField] private WeaponPickup pickupPrefab;
 
@@ -31,6 +34,7 @@ public class WeaponDefinition : ScriptableObject
     public int PelletCount => Mathf.Max(1, pelletCount);
     public float SpreadAngle => Mathf.Max(0f, spreadAngle);
     public GameObject Model => model;
+    public GameObject ImpactEffectPrefab => impactEffectPrefab;
     public WeaponPickup PickupPrefab => pickupPrefab;
     public float DamagePerPellet => Mode == WeaponMode.Spread ? Damage / PelletCount : Damage;
 

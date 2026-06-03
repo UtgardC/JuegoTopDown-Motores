@@ -22,4 +22,5 @@ MonoBehaviour:
   pelletCount: 6
   spreadAngle: 30
   model: {fileID: 3806970199369997715, guid: d96a3555639016f4486e2bbff214ab0f, type: 3}
+  impactEffectPrefab: {fileID: 1453519202490855767, guid: 5f426b3c17aad854f928199d72c8bf93, type: 3}
   pickupPrefab: {fileID: 1173005311657160133, guid: 8ee3bdedd7072c94899110c4bee47c49, type: 3}
