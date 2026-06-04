@@ -48,6 +48,11 @@ public class WeaponPickup : MonoBehaviour
         pickupEnabledTime = Time.time + Mathf.Max(0f, pickupLockoutSeconds);
     }
 
+    public void SetPickupLockout(float pickupLockoutSeconds)
+    {
+        pickupEnabledTime = Time.time + Mathf.Max(0f, pickupLockoutSeconds);
+    }
+
     public void TryGiveWeaponTo(Collider other)
     {
         if (Time.time < pickupEnabledTime || definition == null || other == null)

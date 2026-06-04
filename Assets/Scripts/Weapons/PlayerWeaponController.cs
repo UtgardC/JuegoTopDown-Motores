@@ -17,6 +17,10 @@ public class PlayerWeaponController : MonoBehaviour
     [SerializeField] private float dropUpwardImpulse = 1f;
     [SerializeField] private float pickupLockoutAfterDrop = 1f;
 
+    [Header("Bullet Trails")]
+    [SerializeField] private BulletTrailEffect bulletTrailPrefab;
+    [SerializeField] private bool spawnTrailsForSpread = true;
+
     [Header("Debug")]
     [SerializeField] private bool drawWeaponUsePreview;
     [SerializeField] private bool logWeaponDamage;
@@ -191,15 +195,19 @@ public class PlayerWeaponController : MonoBehaviour
 
     private void FireRaycast(float damage)
     {
-        Ray ray = new Ray(GetFireOriginPosition(), GetShootDirection());
+        Vector3 origin = GetFireOriginPosition();
+        Vector3 direction = GetShootDirection();
+        Ray ray = new Ray(origin, direction);
 
         if (Physics.Raycast(ray, out RaycastHit hit, currentWeapon.Range, raycastMask, QueryTriggerInteraction.Ignore))
         {
+            SpawnBulletTrail(origin, hit.point);
             LogWeaponDamage($"Normal hit {GetColliderInfo(hit.collider)} for {damage:0.##} damage.");
-            ApplyDamage(hit.collider, damage, hit.point, ray.direction, true);
+            ApplyDamage(hit.collider, damage, hit.point, direction, true);
         }
         else
         {
+            SpawnBulletTrail(origin, origin + (direction * currentWeapon.Range));
             LogWeaponDamage($"Normal missed. Range: {currentWeapon.Range:0.##}.");
         }
     }
@@ -224,6 +232,8 @@ public class PlayerWeaponController : MonoBehaviour
 
             if (Physics.Raycast(ray, out RaycastHit hit, currentWeapon.Range, raycastMask, QueryTriggerInteraction.Ignore))
             {
+                SpawnSpreadBulletTrail(origin, hit.point);
+
                 IDamageable damageable = GetDamageable(hit.collider);
                 if (damageable == null)
                 {
@@ -237,6 +247,7 @@ public class PlayerWeaponController : MonoBehaviour
             }
             else
             {
+                SpawnSpreadBulletTrail(origin, origin + (pelletDirection * currentWeapon.Range));
                 LogWeaponDamage($"Spread pellet {i} missed.");
             }
         }
@@ -371,6 +382,25 @@ public class PlayerWeaponController : MonoBehaviour
         }
 
         Instantiate(currentWeapon.ImpactEffectPrefab, position, GetEffectRotation(direction));
+    }
+
+    private void SpawnBulletTrail(Vector3 start, Vector3 end)
+    {
+        if (bulletTrailPrefab == null)
+        {
+            return;
+        }
+
+        BulletTrailEffect trail = Instantiate(bulletTrailPrefab, start, Quaternion.identity);
+        trail.Play(start, end);
+    }
+
+    private void SpawnSpreadBulletTrail(Vector3 start, Vector3 end)
+    {
+        if (spawnTrailsForSpread)
+        {
+            SpawnBulletTrail(start, end);
+        }
     }
 
     private Quaternion GetEffectRotation(Vector3 direction)
