@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.AI;
+using System;
 
 [RequireComponent(typeof(HealthTarget))]
 public abstract class EnemyController : MonoBehaviour
@@ -63,6 +64,9 @@ public abstract class EnemyController : MonoBehaviour
     protected bool IsActivated => activated;
     protected bool IsRetreating => retreating;
     protected bool HasTarget => target != null && playerHealth != null && !playerHealth.IsDead;
+    public bool IsDead => healthTarget == null || healthTarget.IsDead;
+
+    public event Action<EnemyController> Died;
 
     protected virtual void Awake()
     {
@@ -375,6 +379,7 @@ public abstract class EnemyController : MonoBehaviour
     {
         StopMovement();
         DropWeapon();
+        Died?.Invoke(this);
     }
 
     private void DropWeapon()

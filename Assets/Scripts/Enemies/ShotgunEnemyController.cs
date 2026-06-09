@@ -34,12 +34,18 @@ public class ShotgunEnemyController : EnemyShooterController
         for (int i = 0; i < pelletCount; i++)
         {
             float angle = startAngle + (angleStep * i);
-            Vector3 pelletDirection = Quaternion.AngleAxis(angle, Vector3.up) * direction;
+            Vector3 pelletDirection = GetValidShotDirection(Quaternion.AngleAxis(angle, Vector3.up) * direction);
 
             if (!RaycastTarget(origin, pelletDirection, AttackRange, out RaycastHit hit))
             {
+                Vector3 end = GetMissEndPoint(origin, pelletDirection);
+                DrawShotDebugLaser(origin, end, false);
+                SpawnSpreadBulletTrail(origin, end);
                 continue;
             }
+
+            DrawShotDebugLaser(origin, hit.point, true);
+            SpawnSpreadBulletTrail(origin, hit.point);
 
             IDamageable damageable = hit.collider.GetComponentInParent<IDamageable>();
             if (damageable == null)
@@ -52,6 +58,14 @@ public class ShotgunEnemyController : EnemyShooterController
         }
 
         ApplySpreadDamage();
+    }
+
+    private void SpawnSpreadBulletTrail(Vector3 start, Vector3 end)
+    {
+        if (SpawnTrailsForSpread)
+        {
+            SpawnBulletTrail(start, end);
+        }
     }
 
     private void AccumulateDamage(IDamageable damageable, float damage, Vector3 hitPoint, Vector3 hitDirection)

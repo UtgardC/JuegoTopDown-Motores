@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -16,6 +17,12 @@ public class PlayerWeaponController : MonoBehaviour
     [SerializeField] private float dropImpulse = 8f;
     [SerializeField] private float dropUpwardImpulse = 1f;
     [SerializeField] private float pickupLockoutAfterDrop = 1f;
+
+    [Header("Unarmed Melee")]
+    [SerializeField] private float unarmedMeleeHitboxSize = 1f;
+    [SerializeField] private float unarmedMeleeDamage = 8f;
+    [SerializeField] private float unarmedMeleeCooldown = 0.35f;
+    [SerializeField] private GameObject unarmedMeleeImpactEffectPrefab;
 
     [Header("Bullet Trails")]
     [SerializeField] private BulletTrailEffect bulletTrailPrefab;
@@ -39,6 +46,13 @@ public class PlayerWeaponController : MonoBehaviour
     public int CurrentAmmo => currentAmmo;
     public bool HasWeapon => currentWeapon != null;
 
+    public event Action<WeaponDefinition, int> WeaponChanged;
+    public event Action<int> AmmoChanged;
+    public event Action<WeaponDefinition, int> WeaponFired;
+    public event Action<WeaponDefinition> EmptyWeaponUsed;
+    public event Action UnarmedMeleeUsed;
+    public event Action<Vector3> UnarmedMeleeImpact;
+
     private struct SpreadDamageHit
     {
         public float Damage;
@@ -52,6 +66,13 @@ public class PlayerWeaponController : MonoBehaviour
         {
             fireOrigin = transform;
         }
+    }
+
+    private void OnValidate()
+    {
+        unarmedMeleeHitboxSize = Mathf.Max(0f, unarmedMeleeHitboxSize);
+        unarmedMeleeDamage = Mathf.Max(0f, unarmedMeleeDamage);
+        unarmedMeleeCooldown = Mathf.Max(0f, unarmedMeleeCooldown);
     }
 
     private void Update()
@@ -125,6 +146,8 @@ public class PlayerWeaponController : MonoBehaviour
             currentWeaponModel.transform.localScale = Vector3.one;
             currentWeaponVisualEffects = currentWeaponModel.GetComponentInChildren<WeaponVisualEffects>(true);
         }
+
+        NotifyWeaponChanged();
     }
 
     public void DropWeapon()
@@ -159,6 +182,24 @@ public class PlayerWeaponController : MonoBehaviour
 
     private void TryUseWeapon()
     {
+        if (currentWeapon == null)
+        {
+            TryUseUnarmedMelee();
+            return;
+        }
+
+        if (Time.timeScale <= 0f || Time.time < nextFireTime)
+        {
+            return;
+        }
+
+        if (currentAmmo <= 0)
+        {
+            nextFireTime = Time.time + Mathf.Max(0.1f, currentWeapon.FireRate);
+            EmptyWeaponUsed?.Invoke(currentWeapon);
+            return;
+        }
+
         if (!CanUseWeapon())
         {
             return;
@@ -166,6 +207,8 @@ public class PlayerWeaponController : MonoBehaviour
 
         currentAmmo--;
         nextFireTime = Time.time + currentWeapon.FireRate;
+        NotifyAmmoChanged();
+        WeaponFired?.Invoke(currentWeapon, currentAmmo);
         PlayMuzzleFlash();
 
         switch (currentWeapon.Mode)
@@ -175,7 +218,7 @@ public class PlayerWeaponController : MonoBehaviour
                 break;
 
             case WeaponMode.Melee:
-                FireMelee();
+                FireMelee(currentWeapon.Damage, currentWeapon.Range, currentWeapon.ImpactEffectPrefab, "Melee", false);
                 break;
 
             case WeaponMode.Normal:
@@ -191,6 +234,18 @@ public class PlayerWeaponController : MonoBehaviour
             && currentAmmo > 0
             && Time.timeScale > 0f
             && Time.time >= nextFireTime;
+    }
+
+    private void TryUseUnarmedMelee()
+    {
+        if (Time.timeScale <= 0f || Time.time < nextFireTime)
+        {
+            return;
+        }
+
+        nextFireTime = Time.time + unarmedMeleeCooldown;
+        UnarmedMeleeUsed?.Invoke();
+        FireMelee(unarmedMeleeDamage, unarmedMeleeHitboxSize, unarmedMeleeImpactEffectPrefab, "Unarmed melee", true);
     }
 
     private void FireRaycast(float damage)
@@ -255,14 +310,15 @@ public class PlayerWeaponController : MonoBehaviour
         ApplySpreadDamage();
     }
 
-    private void FireMelee()
+    private void FireMelee(float damage, float hitboxSize, GameObject impactEffectPrefab, string logLabel, bool notifyUnarmedImpact)
     {
         Vector3 direction = GetShootDirection();
-        float radius = currentWeapon.Range;
+        float radius = Mathf.Max(0f, hitboxSize);
         Vector3 center = GetFireOriginPosition() + (direction * radius);
         Collider[] hits = Physics.OverlapSphere(center, radius, meleeMask, QueryTriggerInteraction.Ignore);
 
         meleeHits.Clear();
+        bool impactNotified = false;
 
         for (int i = 0; i < hits.Length; i++)
         {
@@ -276,9 +332,15 @@ public class PlayerWeaponController : MonoBehaviour
             Vector3 hitPoint = hits[i].ClosestPoint(center);
             Vector3 effectDirection = GetDirectionFromHitPointToPlayer(hitPoint);
 
-            LogWeaponDamage($"Melee hit {GetDamageableInfo(damageable)} through {GetColliderInfo(hits[i])} for {currentWeapon.Damage:0.##} damage.");
-            damageable.TakeDamage(currentWeapon.Damage, hitPoint, direction);
-            SpawnImpactEffect(hitPoint, effectDirection);
+            LogWeaponDamage($"{logLabel} hit {GetDamageableInfo(damageable)} through {GetColliderInfo(hits[i])} for {damage:0.##} damage.");
+            damageable.TakeDamage(damage, hitPoint, direction);
+            SpawnImpactEffect(impactEffectPrefab, hitPoint, effectDirection);
+
+            if (notifyUnarmedImpact && !impactNotified)
+            {
+                impactNotified = true;
+                UnarmedMeleeImpact?.Invoke(hitPoint);
+            }
         }
     }
 
@@ -376,12 +438,15 @@ public class PlayerWeaponController : MonoBehaviour
 
     private void SpawnImpactEffect(Vector3 position, Vector3 direction)
     {
-        if (currentWeapon == null || currentWeapon.ImpactEffectPrefab == null)
-        {
-            return;
-        }
+        SpawnImpactEffect(currentWeapon != null ? currentWeapon.ImpactEffectPrefab : null, position, direction);
+    }
 
-        Instantiate(currentWeapon.ImpactEffectPrefab, position, GetEffectRotation(direction));
+    private void SpawnImpactEffect(GameObject impactEffectPrefab, Vector3 position, Vector3 direction)
+    {
+        if (impactEffectPrefab != null)
+        {
+            Instantiate(impactEffectPrefab, position, GetEffectRotation(direction));
+        }
     }
 
     private void SpawnBulletTrail(Vector3 start, Vector3 end)
@@ -459,6 +524,7 @@ public class PlayerWeaponController : MonoBehaviour
         fireHeld = false;
         currentWeaponVisualEffects = null;
         ClearEquippedModel();
+        NotifyWeaponChanged();
     }
 
     private void ClearEquippedModel()
@@ -471,14 +537,31 @@ public class PlayerWeaponController : MonoBehaviour
         currentWeaponVisualEffects = null;
     }
 
+    private void NotifyWeaponChanged()
+    {
+        WeaponChanged?.Invoke(currentWeapon, currentAmmo);
+        NotifyAmmoChanged();
+    }
+
+    private void NotifyAmmoChanged()
+    {
+        AmmoChanged?.Invoke(currentAmmo);
+    }
+
     private void OnDrawGizmos()
     {
-        if (!drawWeaponUsePreview || currentWeapon == null)
+        if (!drawWeaponUsePreview)
         {
             return;
         }
 
         Gizmos.color = Color.red;
+
+        if (currentWeapon == null)
+        {
+            DrawMeleePreview(unarmedMeleeHitboxSize);
+            return;
+        }
 
         switch (currentWeapon.Mode)
         {
@@ -487,7 +570,7 @@ public class PlayerWeaponController : MonoBehaviour
                 break;
 
             case WeaponMode.Melee:
-                DrawMeleePreview();
+                DrawMeleePreview(currentWeapon.Range);
                 break;
 
             case WeaponMode.Normal:
@@ -518,10 +601,10 @@ public class PlayerWeaponController : MonoBehaviour
         }
     }
 
-    private void DrawMeleePreview()
+    private void DrawMeleePreview(float hitboxSize)
     {
         Vector3 direction = GetShootDirection();
-        float radius = currentWeapon.Range;
+        float radius = Mathf.Max(0f, hitboxSize);
         Vector3 center = GetFireOriginPosition() + (direction * radius);
         Gizmos.DrawWireSphere(center, radius);
     }

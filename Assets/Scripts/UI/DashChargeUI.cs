@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UI;
 
 public class DashChargeUI : MonoBehaviour
 {
@@ -7,16 +8,18 @@ public class DashChargeUI : MonoBehaviour
     private PlayerController player;
 
     [SerializeField]
-    [Tooltip("RectTransform used as the vertical fill of the dash bar.")]
-    private RectTransform dashFill;
+    [Tooltip("Image used as the filled dash bar. Set Image Type to Filled.")]
+    private Image dashFillImage;
 
     [SerializeField]
-    [Tooltip("If active, the initial height of Dash Fill is used as the full height.")]
-    private bool useInitialFillHeightAsMax = true;
+    [Range(0f, 1f)]
+    [Tooltip("Fill amount used when dash charge is empty.")]
+    private float minimumFillAmount = 0f;
 
     [SerializeField]
-    [Tooltip("Maximum fill height used when Use Initial Fill Height As Max is disabled.")]
-    private float maxFillHeight = 300f;
+    [Range(0f, 1f)]
+    [Tooltip("Fill amount used when dash charge is full.")]
+    private float maximumFillAmount = 1f;
 
     [SerializeField]
     [Tooltip("Objects enabled when each dash charge is available.")]
@@ -24,12 +27,13 @@ public class DashChargeUI : MonoBehaviour
 
     private void Awake()
     {
-        if (useInitialFillHeightAsMax && dashFill != null)
-        {
-            maxFillHeight = dashFill.sizeDelta.y;
-        }
-
         Refresh();
+    }
+
+    private void OnValidate()
+    {
+        minimumFillAmount = Mathf.Clamp01(minimumFillAmount);
+        maximumFillAmount = Mathf.Clamp01(maximumFillAmount);
     }
 
     private void Update()
@@ -50,7 +54,7 @@ public class DashChargeUI : MonoBehaviour
 
     private void UpdateFill()
     {
-        if (dashFill == null)
+        if (dashFillImage == null)
         {
             return;
         }
@@ -59,9 +63,7 @@ public class DashChargeUI : MonoBehaviour
             ? Mathf.Clamp01(player.CurrentDashPoints / player.MaxDashPoints)
             : 0f;
 
-        Vector2 sizeDelta = dashFill.sizeDelta;
-        sizeDelta.y = Mathf.Lerp(0f, maxFillHeight, normalizedDashPoints);
-        dashFill.sizeDelta = sizeDelta;
+        dashFillImage.fillAmount = Mathf.Lerp(minimumFillAmount, maximumFillAmount, normalizedDashPoints);
     }
 
     private void UpdateChargeSprites()

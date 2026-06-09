@@ -1,9 +1,10 @@
 using System.Collections.Generic;
+using System;
 using UnityEngine;
 
-public class KatanaEnemyController : EnemyController
+public class MeleeEnemyController : EnemyController
 {
-    [Header("Katana")]
+    [Header("Melee")]
     [SerializeField] private float attackDamage = 25f;
     [SerializeField] private float attackRange = 1.8f;
     [SerializeField] private float attackRadius = 1.1f;
@@ -23,6 +24,9 @@ public class KatanaEnemyController : EnemyController
     private float attackTimer;
     private float nextAttackTime;
     private Vector3 lockedAttackDirection;
+
+    public event Action<MeleeEnemyController> AttackStarted;
+    public event Action<MeleeEnemyController> AttackExecuted;
 
     protected override void OnValidate()
     {
@@ -61,6 +65,7 @@ public class KatanaEnemyController : EnemyController
             preparingAttack = true;
             attackTimer = 0f;
             lockedAttackDirection = GetAimDirectionToTarget(GetAttackOriginPosition(), targetAimHeight);
+            AttackStarted?.Invoke(this);
         }
 
         RotateTowardsDirection(lockedAttackDirection);
@@ -72,6 +77,7 @@ public class KatanaEnemyController : EnemyController
         }
 
         ExecuteAttack();
+        AttackExecuted?.Invoke(this);
         nextAttackTime = Time.time + attackCooldown;
         CancelAttack();
     }

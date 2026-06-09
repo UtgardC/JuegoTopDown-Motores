@@ -95,6 +95,7 @@ public class SubmachineGunEnemyController : EnemyShooterController
         }
 
         ExecuteLockedAttack(currentBurstDirection.normalized);
+        NotifyShotFired();
         shotsRemaining--;
         nextShotTime = Time.time + burstCadence;
 

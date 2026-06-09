@@ -14,10 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WeaponDefinition
   weaponName: Subfusil
   mode: 0
-  ammo: 30
+  ammo: 24
   damage: 5
   range: 12
-  fireRate: 0.1
+  fireRate: 0.09
   automatic: 1
   pelletCount: 10
   spreadAngle: 30

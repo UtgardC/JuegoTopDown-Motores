@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 7492733644454844589}
   - component: {fileID: 2596819008408081691}
   - component: {fileID: 1524757316679088267}
+  - component: {fileID: -1124743369538895863}
   m_Layer: 6
   m_Name: Subfusil Pickup
   m_TagString: Untagged
@@ -158,6 +159,59 @@ MonoBehaviour:
   definition: {fileID: 11400000, guid: b91f208a729445845abb375f082ddf28, type: 2}
   remainingAmmo: -1
   pickupRoot: {fileID: 0}
+  destroyWhenEmptyAndOffCamera: 1
+  visibilityCamera: {fileID: 0}
+  offCameraDestroyDelay: 0.5
+  viewportMargin: 0.05
+--- !u!114 &-1124743369538895863
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 706045926767838540}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f0bff0300711491c9dc1fdb5b9ea5b72, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponPickupImpactAudio
+  impactCue:
+    clips:
+    - {fileID: 8300000, guid: 60da913dd25ea8e4b86974571e42b28c, type: 3}
+    - {fileID: 8300000, guid: 7796b93a59bbc624ab2eb837b6f502d4, type: 3}
+    - {fileID: 8300000, guid: ba82841f3105b9640b2be8e4b9c68ab5, type: 3}
+    volume: 1
+    pitchRange: {x: 0.9, y: 1.1}
+    spatialBlend: 1
+    minDistance: 1
+    maxDistance: 30
+  minimumImpactSpeed: 1.5
+  maximumImpactSpeed: 9
+  minimumSecondsBetweenSounds: 0.15
+  volumeBySpeed:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 1
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 1
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
 --- !u!1 &2251658840438635704
 GameObject:
   m_ObjectHideFlags: 0

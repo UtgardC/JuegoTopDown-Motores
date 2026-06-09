@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using System;
 
 [RequireComponent(typeof(CharacterController))]
 public class PlayerController : MonoBehaviour
@@ -93,6 +94,8 @@ public class PlayerController : MonoBehaviour
     public Vector3 SightAimWorldPoint => sightAimWorldPoint;
     public float CurrentAimRange => GetCurrentSightAimRange();
     public float CurrentWeaponAimRange => GetCurrentWeaponAimRange();
+
+    public event Action DashStarted;
 
     private int SafeMaxDashCharges => Mathf.Max(1, maxDashCharges);
     private float SafeDashPointsPerCharge => Mathf.Max(1f, dashPointsPerCharge);
@@ -232,6 +235,7 @@ public class PlayerController : MonoBehaviour
         dashDirection = requestedDashDirection.normalized;
         dashElapsed = 0f;
         isDashing = true;
+        DashStarted?.Invoke();
     }
 
     private void MoveDash()

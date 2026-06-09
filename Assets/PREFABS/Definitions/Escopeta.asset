@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WeaponDefinition
   weaponName: Escopeta
   mode: 1
-  ammo: 8
+  ammo: 5
   damage: 160
   range: 8
   fireRate: 1

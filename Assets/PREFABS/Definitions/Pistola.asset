@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WeaponDefinition
   weaponName: Pistola
   mode: 0
-  ammo: 10
+  ammo: 12
   damage: 10
   range: 20
   fireRate: 0.25

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -8,13 +9,22 @@ public class EnemyActivationGroup : MonoBehaviour
     [SerializeField] private List<EnemyController> enemies = new List<EnemyController>();
 
     private bool activated;
+    private bool cleared;
 
     public bool IsActivated => activated;
+    public bool IsCleared => cleared;
+
+    public event Action<EnemyActivationGroup> Activated;
+    public event Action<EnemyActivationGroup> Cleared;
 
     private void Awake()
     {
-        RegisterConfiguredEnemies();
         AcquirePlayer();
+    }
+
+    private void OnEnable()
+    {
+        RegisterConfiguredEnemies();
     }
 
     public void RegisterEnemy(EnemyController enemy)
@@ -29,6 +39,8 @@ public class EnemyActivationGroup : MonoBehaviour
             enemies.Add(enemy);
         }
 
+        enemy.Died -= HandleEnemyDied;
+        enemy.Died += HandleEnemyDied;
         enemy.SetActivationGroup(this);
     }
 
@@ -54,6 +66,7 @@ public class EnemyActivationGroup : MonoBehaviour
         }
 
         activated = true;
+        cleared = false;
         RegisterConfiguredEnemies();
 
         for (int i = 0; i < enemies.Count; i++)
@@ -63,6 +76,10 @@ public class EnemyActivationGroup : MonoBehaviour
                 enemies[i].Activate(playerHealth);
             }
         }
+
+        Activated?.Invoke(this);
+        AudioManager.NotifyCombatGroupActivated(this);
+        CheckCleared();
     }
 
     private void RegisterConfiguredEnemies()
@@ -80,7 +97,20 @@ public class EnemyActivationGroup : MonoBehaviour
         {
             if (enemies[i] != null)
             {
+                enemies[i].Died -= HandleEnemyDied;
+                enemies[i].Died += HandleEnemyDied;
                 enemies[i].SetActivationGroup(this);
+            }
+        }
+    }
+
+    private void OnDisable()
+    {
+        for (int i = 0; i < enemies.Count; i++)
+        {
+            if (enemies[i] != null)
+            {
+                enemies[i].Died -= HandleEnemyDied;
             }
         }
     }
@@ -91,5 +121,30 @@ public class EnemyActivationGroup : MonoBehaviour
         {
             playerHealth = FindAnyObjectByType<Health>();
         }
+    }
+
+    private void HandleEnemyDied(EnemyController enemy)
+    {
+        CheckCleared();
+    }
+
+    private void CheckCleared()
+    {
+        if (!activated || cleared)
+        {
+            return;
+        }
+
+        for (int i = 0; i < enemies.Count; i++)
+        {
+            if (enemies[i] != null && !enemies[i].IsDead)
+            {
+                return;
+            }
+        }
+
+        cleared = true;
+        Cleared?.Invoke(this);
+        AudioManager.NotifyCombatGroupCleared(this);
     }
 }
